@@ -1,0 +1,29 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage[colorlinks=true]{hyperref}
+\title{Paragraph and Equation Editing}
+\author{SideX LaTeX Studio}
+\date{}
+\begin{document}
+\maketitle
+\begin{abstract}
+This example demonstrates continuous paragraph editing and live equation editing while retaining the original LaTeX document structure.
+\end{abstract}
+\section{Paragraph editing}
+A coherent scene requires stable geometry and consistent appearance. This entire paragraph can be revised from the preview. Adding sentences updates line wrapping and background pagination.
+
+A \textbf{formatted paragraph} retains its commands. Its inline formulas are $E=mc^2$ and \(\alpha+\beta\). Use the LaTeX mode or a formula button to edit them.
+\section{Display equations}
+The energy is defined by Equation~\ref{eq:energy}:
+\begin{equation}\label{eq:energy}
+  E = mc^2.
+\end{equation}
+The equation label and numbering stay outside the edited expression.
+
+Multiple aligned rows can be edited together:
+\begin{align}
+  a + b &= c, \\
+  x^2 + y^2 &= z^2.
+\end{align}
+\end{document}

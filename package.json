@@ -1,0 +1,47 @@
+{
+  "name": "sidex-latex-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A local LaTeX workspace with direct PDF editing and project management.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "scripts": {
+    "dev": "vite --config vite.latex.config.ts --open /home",
+    "build": "vite build --config vite.latex.config.ts",
+    "start": "node scripts/latex/serve.mjs",
+    "test": "node --experimental-strip-types --test scripts/latex/source-map.test.mjs scripts/latex/process.test.mjs scripts/latex/rtex-mapping.test.mjs scripts/latex/block-edit.test.mjs scripts/latex/model-provider.test.mjs scripts/latex/render-performance.test.mjs scripts/latex/source-bindings.test.mjs scripts/latex/editing-safety.test.mjs scripts/latex/project-agent.test.mjs scripts/latex/agent-ui.test.mjs scripts/latex/page-editor.test.mjs scripts/latex/page-tools.test.mjs scripts/latex/object-move.test.mjs scripts/latex/object-resize.test.mjs scripts/latex/object-editor.test.mjs scripts/latex/object-drag.test.mjs scripts/latex/raster-frame.test.mjs scripts/latex/overlay-safety.test.mjs scripts/latex/preview-safety.test.mjs scripts/latex/document-dispatch.test.mjs scripts/latex/analysis-scheduling.test.mjs scripts/latex/rtex-compat.test.mjs scripts/latex/overlay-safety-cache.test.mjs scripts/latex/source-bindings-performance.test.mjs scripts/latex/rtex-command.test.mjs scripts/latex/session-resume.test.mjs scripts/latex/rtex-host.test.mjs scripts/latex/projects.test.mjs scripts/latex/studio-bridge.test.mjs scripts/latex/runtime-paths.test.mjs scripts/latex/workspace-request.test.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.latex.json",
+    "setup:rtex": "node scripts/latex/setup-rtex.mjs",
+    "test:session": "node scripts/latex/live-session.integration.mjs",
+    "test:page-tools": "node scripts/latex/page-tools.integration.mjs",
+    "test:host": "node scripts/latex/rtex-host.integration.mjs",
+    "test:blocks": "node scripts/latex/blocks.integration.mjs",
+    "test:agent": "node scripts/latex/agent.integration.mjs",
+    "latex:build": "vite build --config vite.latex.config.ts",
+    "latex:dev": "vite --config vite.latex.config.ts --open /home",
+    "latex:serve": "node scripts/latex/serve.mjs",
+    "latex:test": "node --experimental-strip-types --test scripts/latex/source-map.test.mjs scripts/latex/process.test.mjs scripts/latex/rtex-mapping.test.mjs scripts/latex/block-edit.test.mjs scripts/latex/model-provider.test.mjs scripts/latex/render-performance.test.mjs scripts/latex/source-bindings.test.mjs scripts/latex/editing-safety.test.mjs scripts/latex/project-agent.test.mjs scripts/latex/agent-ui.test.mjs scripts/latex/page-editor.test.mjs scripts/latex/page-tools.test.mjs scripts/latex/object-move.test.mjs scripts/latex/object-resize.test.mjs scripts/latex/object-editor.test.mjs scripts/latex/object-drag.test.mjs scripts/latex/raster-frame.test.mjs scripts/latex/overlay-safety.test.mjs scripts/latex/preview-safety.test.mjs scripts/latex/document-dispatch.test.mjs scripts/latex/analysis-scheduling.test.mjs scripts/latex/rtex-compat.test.mjs scripts/latex/overlay-safety-cache.test.mjs scripts/latex/source-bindings-performance.test.mjs scripts/latex/rtex-command.test.mjs scripts/latex/session-resume.test.mjs scripts/latex/rtex-host.test.mjs scripts/latex/projects.test.mjs scripts/latex/studio-bridge.test.mjs scripts/latex/runtime-paths.test.mjs scripts/latex/workspace-request.test.mjs"
+  },
+  "dependencies": {
+    "@vscode/codicons": "0.0.45",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "5.5.0",
+    "monaco-editor": "0.52.2",
+    "opentype.js": "1.3.4",
+    "pdfjs-dist": "4.10.38",
+    "ws": "8.22.1"
+  },
+  "optionalDependencies": {
+    "node-pty": "1.1.0"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "0.1.100",
+    "@types/trusted-types": "2.0.7",
+    "esbuild": "0.25.12",
+    "typescript": "5.6.3",
+    "vite": "6.4.2"
+  }
+}
