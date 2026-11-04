@@ -1,5 +1,7 @@
 # SideX LaTeX Studio
 
+[Watch the feature demo: 56 seconds, silent interface animation](docs/media/demo.mp4)
+
 **A local LaTeX workspace with a project home, source-linked PDF editing, and a configurable AI agent.**
 
 [简体中文](README.zh-CN.md) · [Project advantages](docs/PROJECT_ADVANTAGES.zh-CN.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)

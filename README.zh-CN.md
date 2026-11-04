@@ -1,5 +1,7 @@
 # SideX LaTeX Studio
 
+[观看功能演示：56 秒，无声，界面操作动画](docs/media/demo.mp4)
+
 **带项目主页、PDF 原位编辑和可配置智能体的本地 LaTeX 工作区。**
 
 [English](README.md) · [项目优势与性能说明](docs/PROJECT_ADVANTAGES.zh-CN.md) · [第三方声明](THIRD_PARTY_NOTICES.md)
