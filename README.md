@@ -56,6 +56,8 @@ npm run dev
 
 Normal compilation supports the available pdfLaTeX, XeLaTeX, and LuaLaTeX engines. The optional real-time integration uses LuaLaTeX and a pinned realtime-tex 0.0.6 runtime.
 
+The native session resolves files relative to the selected main document, while the editor and agent retain the full project scope. On Windows, an isolated compatibility runner handles legacy pdfTeX page dimensions and legacy Times font defaults without editing the manuscript. At startup, explicit dependencies outside the main document directory fall back to normal compilation. The runner uses the Windows .NET Framework 4 compiler; if it is unavailable, normal compilation remains available.
+
 For the tested Windows x64 path, install Python 3.9+ and TeX Live with LuaLaTeX, then run:
 
 ~~~sh

@@ -56,6 +56,8 @@ npm run dev
 
 普通编译使用本机可用的 pdfLaTeX、XeLaTeX 或 LuaLaTeX。实时段落排版使用 LuaLaTeX 和固定的 realtime-tex 0.0.6。
 
+原生会话按所选主文件目录解析章节路径，编辑器和智能体仍保留完整项目范围。Windows 下通过隔离的兼容启动器处理旧式 pdfTeX 纸张尺寸命令和旧式 Times 字体默认值，不修改论文源码。启动实时模式时，若检测到明确引用主文件目录外资源，会回退普通编译。兼容启动器使用 Windows .NET Framework 4 编译器；若系统缺少它，普通编译仍可使用。
+
 已验证的 Windows x64 路径需要 Python 3.9+ 和带 LuaLaTeX 的 TeX Live，然后执行：
 
 ~~~sh

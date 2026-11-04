@@ -5,7 +5,8 @@ import { spawn } from 'node:child_process';
 import { ResourceLoader } from './vendor/resources.mjs';
 import { terminateTree } from './process.mjs';
 import { documentEdit } from './document-edit.mjs';
-import { prepareRtexTexdir } from './rtex-compat.mjs';
+import {realtimeProjectPaths,externalRealtimeDependency,realtimeDiagnosticPaths} from './rtex-project-paths.mjs';
+import { prepareRtexTexdir, prepareRtexLatexRunner, needsLegacyOt1 } from './rtex-compat.mjs';
 import { selectRtexCommand } from './rtex-command.mjs';
 import {detectTexRuntime,withTexPath} from './runtime-paths.mjs';
 
@@ -28,6 +29,7 @@ export class RealtimeManager {
   log = '';
   root = '';
   main = '';
+  nativePaths = null;
   build = '';
   documents = new Set();
   documentTexts = new Map();
@@ -96,6 +98,7 @@ export class RealtimeManager {
     if (m.type === 'document') {
       await this.safe(m.file);
       if (!/\.(tex|bib|sty|cls)$/.test(m.file) || typeof m.text !== 'string') throw Error('该文件类型不支持实时更新。');
+      if(this.nativePaths&&this.nativePaths.toNative(m.file)===null){this.documentTexts.set(m.file,m.text);if(m.sequence!==undefined)this.send({type:'document-ack',file:m.file,sequence:m.sequence,revision:this.sourceRevision,route:'inactive-document'},ws);return;}
       this.documents.add(m.file);
       if (this.startupPending) {
         this.startupEdits.set(m.file,m.text);
@@ -110,24 +113,29 @@ export class RealtimeManager {
       const before = this.documentTexts.get(m.file);
       this.documentTexts.set(m.file, m.text);
       const metadata = { file: m.file, before, text: m.text, sequence: m.sequence };
-      if (before === undefined || !m.file.endsWith('.tex')) this.command({ cmd: 'set_document', path: m.file, text: m.text }, metadata);
+      if (before === undefined || !m.file.endsWith('.tex')) this.command({ cmd: 'set_document', path: this.nativePaths?.toNative(m.file)??m.file, text: m.text }, metadata);
       else {
         const edit = documentEdit(before, m.text);
-        if (edit) this.command({ cmd: 'edit', path: m.file, ...edit }, metadata);
+        if (edit) this.command({ cmd: 'edit', path: this.nativePaths?.toNative(m.file)??m.file, ...edit }, metadata);
         else if (m.sequence !== undefined) this.send({ type: 'document-ack', file: m.file, sequence: m.sequence, revision: this.sourceRevision }, ws);
       }
       this.spans(m.file);
   }
   command(value, metadata = {}) { if (this.child?.stdin.writable) { this.commands.push({ cmd: value.cmd, ...metadata }); this.child.stdin.write(JSON.stringify(value) + '\n'); } }
-  spans(file) { this.command({ cmd: 'spans', path: file }, { file, source: this.documentTexts.get(file) }); }
+  spans(file,source=this.documentTexts.get(file)) { const native=this.nativePaths?this.nativePaths.toNative(file):file;if(native!==null)this.command({ cmd: 'spans', path: native }, { file, source }); }
 
   async start(root, main, documents) {
     await this.stop();
+    const generation=++this.generation;
+    const nativePaths=realtimeProjectPaths(root,main);
     if (!realtimeAvailability().installed) throw Error('realtime-tex 未安装，请运行 npm run latex:rtex:setup。');
+    const external=externalRealtimeDependency(main,documents);
+    if(external){this.phase='stopped';this.send({type:'error',fallback:true,message:'当前主文件引用了排版目录外的文件（'+external+'），已保留普通编译。'});return;}
     const preparedTexdir=await prepareRtexTexdir(texdir,path.join(checkout,'.runtime/rtex/compat'));
-    const generation = ++this.generation;
-    this.root = root; this.main = main; this.build = path.join(root, '.sidex-realtime');
-    this.documents = new Set(documents.filter(f => /\.(tex|bib|sty|cls)$/.test(f.name)).map(f => f.name));
+    if(this.generation!==generation)return;
+    this.nativePaths=nativePaths;
+    this.root = root; this.main = main; this.build = path.join(root, '.sidex-realtime',nativePaths.cacheName);
+    this.documents = new Set(documents.filter(f => /\.(tex|bib|sty|cls)$/.test(f.name)&&nativePaths.toNative(f.name)!==null).map(f => f.name));
     this.documents.add(main);
     for (const file of this.documents) await this.safe(file);
     this.documentTexts = new Map(documents.map(f => [f.name, f.content]));
@@ -138,7 +146,8 @@ export class RealtimeManager {
     await fs.mkdir(this.build, { recursive: true });
     const env=withTexPath({...process.env,RTEX_TEXDIR:preparedTexdir,MIKTEX_ENABLE_INSTALLER:'0'},texRuntime);
     if (realtimeAvailability().texlive) {
-      env.RTEX_TEXLIVE_BIN=texliveBin;
+      try{env.RTEX_TEXLIVE_BIN=await prepareRtexLatexRunner(texRuntime.commands.lualatex,path.join(checkout,'.runtime/rtex/compat'),{env});}catch(error){if(this.generation!==generation)return;this.phase='stopped';this.startupPending=false;this.send({type:'error',fallback:true,message:'实时排版兼容组件不可用：'+error.message});return;}
+      env.SIDEX_RTEX_LEGACY_OT1=needsLegacyOt1(nativePaths.nativeMain,[...this.documentTexts].filter(([name])=>this.documents.has(name)).map(([name,content])=>({name:nativePaths.toNative(name),content})))?'1':'0';
       for (const name of ['TEXMFVAR', 'TEXMFCONFIG', 'TEXMFHOME']) env[name] = path.join(texRuntime.texmfRoot,name==='TEXMFVAR'?'texmf-var':name==='TEXMFCONFIG'?'texmf-config':'texmf-home');
     } else {
       env.MIKTEX_USERDATA = path.join(checkout, '.runtime/miktex-data');
@@ -147,7 +156,9 @@ export class RealtimeManager {
     const loader = new ResourceLoader(env, text => { this.log = (this.log + text + '\n').slice(-50000); });
     const command=await selectRtexCommand({executable,distribution,checkout,env});
     this.engineHost=command.kind;
-    const child = spawn(command.command, [...command.prefix,'serve', '--project', root, '--main', main, '--build', this.build,...(command.suffix||[])], { cwd: root, env, windowsHide: true, stdio: 'pipe' });
+    if(this.generation!==generation)return;
+    this.nativePaths=nativePaths;
+    const child = spawn(command.command, [...command.prefix,'serve', '--project', nativePaths.nativeRoot, '--main', nativePaths.nativeMain, '--build', this.build,...(command.suffix||[])], { cwd: nativePaths.nativeRoot, env, windowsHide: true, stdio: 'pipe' });
     child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
     this.child = child;
     const watchdog = setTimeout(() => { if (this.generation === generation && !this.lastLayout) { this.send({ type: 'error', fallback: true, message: '实时引擎初始化超时，已停止；可使用原编译路径。' }); void this.stop(); } }, 90000);
@@ -169,9 +180,10 @@ export class RealtimeManager {
     child.once('error', error => { clearTimeout(watchdog); if (this.generation === generation) { this.child = null; this.send({ type: 'error', message: error.message }); } });
     child.once('exit', code => { clearTimeout(watchdog); if (this.generation === generation) { this.child = null; this.phase = 'stopped'; this.send({ type: 'state', state: 'stopped', message: `实时引擎已停止 (${code ?? 'interrupted'})` }); } });
     const originals = new Map(await Promise.all([...this.documents].map(async file => [file, await fs.readFile(await this.safe(file), 'utf8')])));
+    if(this.generation!==generation)return;
     this.documentTexts = new Map(originals);
     // Capture the source of the initial disk layout before restoring unsaved drafts.
-    for (const [file, source] of originals) if (file.endsWith('.tex')) this.command({cmd:'spans',path:file},{file,source});
+    for (const [file, source] of originals) if (file.endsWith('.tex')) this.spans(file,source);
     for (const f of documents) if (this.documents.has(f.name)) {
       const disk = originals.get(f.name);
       if (disk !== f.content) this.startupEdits.set(f.name,f.content);
@@ -180,6 +192,7 @@ export class RealtimeManager {
     this.startupReady = true; this.restoreStartup();
   }
   async receive(value, loader, generation = this.generation) {
+    if(this.nativePaths)value=realtimeDiagnosticPaths(value,this.nativePaths,this.documents);
     const request = value.reply ? this.commands.shift() : null;
     if (value.reply === 'error') {
       if (request?.sequence !== undefined) {
@@ -205,7 +218,7 @@ export class RealtimeManager {
       // A full PDF already contains the figures. Sending/rasterizing them again
       // can create dozens of concurrent PDF workers for a single paper.
       const hasPdf = value.event === 'LayoutUpdate' && (value.pdf_fallback || existsSync(path.join(this.build, 'bg', `layout-${value.versions.layout_version}.pdf`)));
-      const [fonts, images] = await Promise.all([loader.fontsFor(dls, new Set(this.fonts.keys())), hasPdf ? new Map() : loader.imagesFor(dls, new Set(this.images.keys()), this.root)]);
+      const [fonts, images] = await Promise.all([loader.fontsFor(dls, new Set(this.fonts.keys())), hasPdf ? new Map() : loader.imagesFor(dls, new Set(this.images.keys()), this.nativePaths?.nativeRoot||this.root)]);
       if (this.generation !== generation) return;
       const f = [...fonts].map(([key, resource]) => [key, wireResource(resource)]), i = [...images].map(([key, resource]) => [key, wireResource(resource)]);
       for (const pair of f) this.fonts.set(...pair); for (const pair of i) this.images.set(...pair);
@@ -249,7 +262,7 @@ export class RealtimeManager {
   }
 
   async stop() {
-    const child = this.child; this.child = null; this.generation++; this.phase = 'stopped';
+    const child = this.child; this.child = null; this.nativePaths=null; this.generation++; this.phase = 'stopped';
     if (child) {
       try { child.stdin.end(JSON.stringify({ cmd: 'quit' }) + '\n'); } catch {}
       await Promise.race([new Promise(resolve => child.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 1000))]);

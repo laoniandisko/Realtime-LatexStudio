@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createServer} from 'node:http';
-import {prepareRtexTexdir} from './rtex-compat.mjs';
+import {prepareRtexTexdir,prepareRtexLatexRunner,needsLegacyOt1} from './rtex-compat.mjs';
+import {execFile,spawn} from 'node:child_process';
 
 const checkout=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const originalLabels=`    local n = 0
@@ -127,6 +128,10 @@ This final sentence checks that the remainder remains connected after author nam
  const source=String.raw`\documentclass[twocolumn]{article}
 \usepackage{times,graphicx}
 \usepackage[authoryear,round]{natbib}
+\setlength{\pdfpagewidth}{8.5in}
+\setlength{\pdfpageheight}{11in}
+\ifx\pdfpagewidth\pagewidth\else\errmessage{page width is not a dimension alias}\fi
+\ifx\pdfpageheight\pageheight\else\errmessage{page height is not a dimension alias}\fi
 \begin{document}
 \section{Verification}
 
@@ -162,6 +167,8 @@ A separate paragraph follows the editable unit and must retain its position.
   // The C ABI 0.0.6 encoder advances twice after M. Without capture padding,
   // consecutive save/set commands and the first glyph after restore disappear.
   const initialItems=initial.value.pages_changed.flatMap(page=>[...(page.dl.other||[]),...page.dl.lines.flatMap(line=>line.items)]);
+   const fontNames=initial.value.pages_changed.flatMap(page=>Object.values(page.dl.fonts||{}).map(font=>font.name));
+   assert(fontNames.some(name=>/ptm|NimbusRom/i.test(name)),'legacy Times roman fell back to a modern default');
   const matrices=initialItems.filter(item=>item[0]==='M');
   assert(matrices.some(item=>item[1]==='set'),'the matrix operand was lost in the C ABI display list');
   assert.deepEqual(matrices.slice(0,3).map(item=>item[1]),['save','set','restore']);
@@ -224,4 +231,108 @@ A separate paragraph follows the editable unit and must retain its position.
 test('an unknown or partially modified matrix writer fails rather than silently losing drawing state',async t=>{
  const {source,cache}=await sandbox(t);await fs.writeFile(path.join(source,'rtex-dl.lua'),'return {}');
  await assert.rejects(prepareRtexTexdir(source,cache),/Unsupported realtime-tex matrix emitter/);
+});
+
+
+test('legacy OT1 detection follows only the selected preamble and respects explicit fonts',()=>{
+ const files=[{name:'paper/main.tex',content:String.raw`\documentclass{article}
+\input{font-setup}
+\begin{document}
+\usepackage{fontspec}
+`},{name:'paper/font-setup.tex',content:String.raw`\usepackage{times,helvet,courier}`},{name:'unrelated.tex',content:String.raw`\usepackage{fontspec}`}];
+ assert.equal(needsLegacyOt1('paper/main.tex',files),true);
+ assert.equal(needsLegacyOt1('main.tex',[{name:'main.tex',content:String.raw`\usepackage{helvet,courier}`}]),false);
+ assert.equal(needsLegacyOt1('main.tex',[{name:'main.tex',content:String.raw`\documentclass{custom}\usepackage{times}`},{name:'custom.cls',content:String.raw`\RequirePackage{fontspec}`}]),false);
+ for(const explicit of [String.raw`\usepackage[T1]{fontenc}`,String.raw`\RequirePackage{fontspec}`,String.raw`\usepackage{unicode-math}`,String.raw`\def\encodingdefault{T1}`,String.raw`\fontencoding{T1}`])assert.equal(needsLegacyOt1('paper/main.tex',[files[0],{name:'paper/font-setup.tex',content:files[1].content+'\n'+explicit}]),false,explicit);
+ assert.equal(needsLegacyOt1('main.tex',[{name:'main.tex',content:String.raw`% \usepackage{times}
+\documentclass{article}
+\begin{document}
+\usepackage{mathptmx}`}]),false);
+ assert.equal(needsLegacyOt1('main.tex',[{name:'main.tex',content:String.raw`\usepackage{mathptmx} % \usepackage{fontspec}
+\begin{document}`}]),true);
+});
+
+const execute=(file,args,options={})=>new Promise((resolve,reject)=>execFile(file,args,{windowsHide:true,timeout:15000,...options},(error,stdout,stderr)=>error?reject(Object.assign(error,{stdout,stderr})):resolve({stdout,stderr})));
+async function fakeLatex(t){
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'sidex-runner-'));
+ t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100}));
+ const tools=path.join(root,'TeX 工具 with spaces');await fs.mkdir(tools);
+ const executable=path.join(tools,'lualatex.exe'),source=path.join(root,'fake.cs');
+ await fs.writeFile(source,String.raw`using System; using System.IO; using System.Text; using System.Threading; using System.Diagnostics;
+class FakeLaTeX { static int Main(string[] args) {
+ if(args.Length>0 && args[0]=="--wait-child"){Thread.Sleep(Timeout.Infinite);return 0;}
+ string pidfile=Environment.GetEnvironmentVariable("SIDEX_RUNNER_TEST_PIDFILE");
+ if(!String.IsNullOrEmpty(pidfile)){
+  var start=new ProcessStartInfo(Process.GetCurrentProcess().MainModule.FileName,"--wait-child");start.UseShellExecute=false;start.CreateNoWindow=true;
+  var child=Process.Start(start);File.WriteAllText(pidfile,Process.GetCurrentProcess().Id+" "+child.Id);Thread.Sleep(Timeout.Infinite);return 0;
+ }
+ foreach(var arg in args)Console.Error.WriteLine("ARG:"+Convert.ToBase64String(Encoding.UTF8.GetBytes(arg)));
+ Console.OpenStandardInput().CopyTo(Console.OpenStandardOutput());
+ return Environment.GetEnvironmentVariable("SIDEX_RUNNER_TEST_EXIT")=="7"?7:0;
+} }`);
+ const compiler=path.join(process.env.SystemRoot||'C:\\Windows','Microsoft.NET/Framework64/v4.0.30319/csc.exe');
+ await execute(compiler,['/nologo','/target:exe','/out:'+executable,source]);
+ return {root,executable,compiler,cache:path.join(root,'cache 中文 with spaces')};
+}
+function throughRunner(executable,args,env,input=Buffer.alloc(0)){
+ return new Promise((resolve,reject)=>{const child=spawn(executable,args,{windowsHide:true,env,stdio:'pipe'}),out=[],err=[];child.stdout.on('data',b=>out.push(b));child.stderr.on('data',b=>err.push(b));child.once('error',reject);child.once('exit',code=>resolve({code,stdout:Buffer.concat(out),stderr:Buffer.concat(err).toString('utf8')}));child.stdin.end(input);});
+}
+
+test('Windows runner preserves byte pipes, Unicode and quoting, exit codes, and atomic cache',{skip:process.platform!=='win32',timeout:30000},async t=>{
+ const {root,executable,compiler,cache}=await fakeLatex(t);
+ const bins=await Promise.all(Array.from({length:4},()=>prepareRtexLatexRunner(executable,cache,{compiler})));
+ assert.equal(new Set(bins).size,1);assert.equal(await prepareRtexLatexRunner(executable,cache,{compiler}),bins[0]);
+ const runner=path.join(bins[0],'lualatex.exe'),args=['-interaction=batchmode','-output-directory='+path.join(root,'dir 中文 with spaces')+'\\',String.raw`\directlua{tex.print("quoted") }\input{paper.tex}`];
+ const bytes=Buffer.from([0,1,10,13,127,128,255,...Buffer.from('中文 pipe','utf8')]);
+ const result=await throughRunner(runner,args,{...process.env,SIDEX_RTEX_LEGACY_OT1:'1',SIDEX_RUNNER_TEST_EXIT:'7'},bytes);
+ assert.equal(result.code,7,result.stderr);assert.deepEqual(result.stdout,bytes);
+ const seen=result.stderr.trim().split(/\r?\n/).map(line=>Buffer.from(line.slice(4),'base64').toString('utf8'));
+ assert.deepEqual(seen.slice(0,-1),args.slice(0,-1));assert(seen.at(-1).startsWith(String.raw`\ifdefined\pdfpagewidth`));assert(seen.at(-1).includes(String.raw`\def\encodingdefault{OT1}\fontencoding{OT1}\selectfont`));assert(seen.at(-1).endsWith(args.at(-1)));
+ const version=await throughRunner(runner,['--version'],{...process.env});assert.equal(version.code,0);assert.equal(Buffer.from(version.stderr.trim().slice(4),'base64').toString('utf8'),'--version');
+ const fileResult=await throughRunner(runner,['-interaction=batchmode','paper 中文 with spaces.tex'],{...process.env,SIDEX_RTEX_LEGACY_OT1:'1'});
+ const fileArgs=fileResult.stderr.trim().split(/\r?\n/).map(line=>Buffer.from(line.slice(4),'base64').toString('utf8'));
+ assert.equal(fileArgs[1],'--jobname=paper 中文 with spaces');assert.equal(fileArgs.length,3);
+ const explicit=await throughRunner(runner,['-jobname=custom','paper.tex'],{...process.env,SIDEX_RTEX_LEGACY_OT1:'1'});
+ const explicitArgs=explicit.stderr.trim().split(/\r?\n/).map(line=>Buffer.from(line.slice(4),'base64').toString('utf8'));
+ assert.equal(explicitArgs.length,2);assert.equal(explicitArgs[0],'-jobname=custom');
+
+ await fs.writeFile(path.join(bins[0],'lualatex.path'),'damaged');
+ await assert.rejects(prepareRtexLatexRunner(executable,cache,{compiler}),/Incomplete or corrupted/);
+});
+
+test('killing the Windows runner closes only its owned engine and descendants',{skip:process.platform!=='win32',timeout:20000},async t=>{
+ const {root,executable,compiler,cache}=await fakeLatex(t),bin=await prepareRtexLatexRunner(executable,cache,{compiler});
+ const pidfile=path.join(root,'owned-pids.txt'),runner=spawn(path.join(bin,'lualatex.exe'),['--version'],{windowsHide:true,env:{...process.env,SIDEX_RUNNER_TEST_PIDFILE:pidfile},stdio:'pipe'});
+ let ids=[];const alive=pid=>{try{process.kill(pid,0);return true;}catch(error){if(error.code==='ESRCH')return false;throw error;}};
+ try{
+  const deadline=Date.now()+5000;while(Date.now()<deadline){try{ids=(await fs.readFile(pidfile,'utf8')).trim().split(' ').map(Number);if(ids.length===2)break;}catch{}await new Promise(resolve=>setTimeout(resolve,10));}
+  assert.equal(ids.length,2,'engine did not report its owned processes');assert(ids.every(alive));
+  runner.kill('SIGKILL');const deadline2=Date.now()+3000;while(Date.now()<deadline2&&ids.some(alive))await new Promise(resolve=>setTimeout(resolve,10));
+  assert(ids.every(pid=>!alive(pid)),'runner left a native engine or descendant running');
+ }finally{if(!runner.killed)runner.kill('SIGKILL');for(const pid of ids)if(alive(pid))process.kill(pid,'SIGKILL');}
+});
+
+
+test('native runner preserves special source names, jobname and explicit font encodings',{
+ skip:process.env.SIDEX_RTEX_NATIVE_TEST!=='1'||process.platform!=='win32',timeout:30000,
+},async t=>{
+ const {detectTexRuntime,withTexPath}=await import('./runtime-paths.mjs');
+ const runtime=detectTexRuntime({root:checkout}),root=await fs.mkdtemp(path.join(os.tmpdir(),'sidex-runner-native-'));
+ t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100}));
+ const env=withTexPath({...process.env,SIDEX_RTEX_LEGACY_OT1:'1'},runtime);
+ for(const[key,name]of [['TEXMFVAR','texmf-var'],['TEXMFCONFIG','texmf-config'],['TEXMFHOME','texmf-home']])env[key]=path.join(runtime.texmfRoot,name);
+ const bin=await prepareRtexLatexRunner(runtime.commands.lualatex,path.join(root,'cache 中文 with spaces'),{env});
+ const name='paper 空格 % & {test}',source=String.raw`\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{times}
+\setlength{\pdfpagewidth}{8.5in}
+\setlength{\pdfpageheight}{11in}
+\ifx\pdfpagewidth\pagewidth\else\errmessage{not a dimension alias}\fi
+\makeatletter\typeout{SIDEX-ENCODING:\encodingdefault}\makeatother
+\begin{document}A safe file path.\end{document}`;
+ await fs.writeFile(path.join(root,name+'.tex'),source);
+ await execute(path.join(bin,'lualatex.exe'),['-interaction=nonstopmode','-halt-on-error',name+'.tex'],{cwd:root,env});
+ assert((await fs.stat(path.join(root,name+'.pdf'))).size>1000);
+ const log=await fs.readFile(path.join(root,name+'.log'),'utf8');assert(log.includes('SIDEX-ENCODING:T1'));assert(!log.includes('Option clash'));
+ assert.equal(await fs.readFile(path.join(root,name+'.tex'),'utf8'),source);
 });
