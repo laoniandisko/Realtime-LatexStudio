@@ -3,6 +3,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStudioBridge } from './studio-bridge.mjs';
+import { installServiceLifecycle } from './service-lifecycle.mjs';
+const lifecycle=installServiceLifecycle(fileURLToPath(new URL('../../.runtime/service-lifecycle.log',import.meta.url)));
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist-latex');
 // Controlled updates retain the current local session so an open editor can save.
 const resumePath=process.argv[2]==='--resume-state'?process.argv[3]:null;
@@ -22,6 +24,6 @@ const server = createServer((req, res) => bridge.middleware(req, res, async () =
 server.on('upgrade', bridge.upgrade);
 const port=Number(process.env.SIDEX_PORT||1421);
 if(!Number.isInteger(port)||port<1||port>65535)throw Error('Invalid SIDEX_PORT.');
-server.listen(port,'127.0.0.1',()=>console.log('SideX LaTeX Studio: http://127.0.0.1:'+port+'/home'));
-function stop() { bridge.close(); server.close(); }
-process.on('SIGINT', stop); process.on('SIGTERM', stop);
+server.listen(port,'127.0.0.1',()=>{lifecycle('listening',{port});console.log('SideX LaTeX Studio: http://127.0.0.1:'+port+'/home');});
+function stop(signal) { lifecycle('signal',{signal});bridge.close(); server.close(); }
+process.on('SIGINT',()=>stop('SIGINT'));process.on('SIGTERM',()=>stop('SIGTERM'));

@@ -1,2 +1,2 @@
 @echo off
-call "%~dp0Start-LaTeXStudio.cmd" %*
+call "%~dp0scripts\launch\Start-LaTeXStudio.cmd" %*

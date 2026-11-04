@@ -6,7 +6,7 @@
 
 **带项目主页、PDF 原位编辑和可配置智能体的本地 LaTeX 工作区。**
 
-[English](README.md) · [项目优势与性能说明](docs/PROJECT_ADVANTAGES.zh-CN.md) · [第三方声明](THIRD_PARTY_NOTICES.md)
+[English](README.md) · [项目优势与性能说明](docs/PROJECT_ADVANTAGES.zh-CN.md) · [第三方声明](docs/THIRD_PARTY_NOTICES.md)
 
 在浏览器中使用 Monaco 编辑 TeX，在真实排版输出中编辑正文和公式，底部保留终端与智能体。项目主页提供新建、导入、搜索、排序、重命名、归档和恢复，无需云端账户。
 
@@ -30,7 +30,7 @@
 先安装 **Node.js 22.11+ LTS 或更新版本**。编译文档还需要 **TeX Live 或 MiKTeX**；尚未安装 TeX 时也能进入项目主页。
 
 1. 下载或克隆完整仓库。
-2. 双击 [一键启动.cmd](一键启动.cmd)，或 [Start-LaTeXStudio.cmd](Start-LaTeXStudio.cmd)。
+2. 双击 [一键启动.cmd](一键启动.cmd)，或 [Start-LaTeXStudio.cmd](scripts/launch/Start-LaTeXStudio.cmd)。
 3. 首次启动自动安装锁定的 npm 依赖，必要时构建，隐藏启动本地服务并打开 **http://127.0.0.1:1421/home**。
 4. 新建项目，或导入已有目录，然后进入工作区。
 
@@ -118,4 +118,4 @@ npm run test:host
 
 ## 许可证与来源
 
-采用 [MIT 许可证](LICENSE)，保留上游版权声明。两个 vendor 目录保留 Henry Yang 的 MIT 许可。Codicons 的 CC BY 4.0、PDF.js 的 Apache 2.0 等依赖许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+采用 [MIT 许可证](LICENSE)，保留上游版权声明。两个 vendor 目录保留 Henry Yang 的 MIT 许可。Codicons 的 CC BY 4.0、PDF.js 的 Apache 2.0 等依赖许可见 [THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md)。

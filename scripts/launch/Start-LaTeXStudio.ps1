@@ -5,7 +5,7 @@ if (-not $env:SystemDrive -and $env:SystemRoot) { $env:SystemDrive = [System.IO.
 # Normalize command lookup only for this process; do not change system settings.
 $nativeExtensions = @($env:PATHEXT -split ';') + @('.COM', '.EXE', '.BAT', '.CMD')
 $env:PATHEXT = ($nativeExtensions | Where-Object { $_ } | Select-Object -Unique) -join ';'
-$studioRoot = $PSScriptRoot
+$studioRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $studioPort = 1421
 if ($env:SIDEX_PORT -and (-not [int]::TryParse($env:SIDEX_PORT, [ref]$studioPort) -or $studioPort -lt 1 -or $studioPort -gt 65535)) { throw 'SIDEX_PORT must be between 1 and 65535.' }
 $studioUrl = "http://127.0.0.1:$studioPort"
@@ -33,7 +33,7 @@ function Test-BuildRequired {
   if (-not (Test-Path -LiteralPath $entry)) { return $true }
   if (-not (Test-Path -LiteralPath (Join-Path $studioRoot 'dist-latex/latex.html'))) { return $true }
   $builtAt = (Get-Item -LiteralPath $entry).LastWriteTimeUtc
-  foreach ($relative in @('home.html', 'latex.html', 'vite.latex.config.ts', 'package.json', 'package-lock.json')) {
+  foreach ($relative in @('src/latex/entry/home.html', 'src/latex/entry/latex.html', 'config/vite.latex.config.ts', 'package.json', 'package-lock.json')) {
     $inputPath = Join-Path $studioRoot $relative
     if ((Test-Path -LiteralPath $inputPath) -and (Get-Item -LiteralPath $inputPath).LastWriteTimeUtc -gt $builtAt) { return $true }
   }

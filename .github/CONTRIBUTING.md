@@ -27,6 +27,6 @@ npm run test:host
 - Treat TeX output as authoritative. Keep the existing fallback for approximate or unsafe local overlays.
 - Measure the affected stage when claiming a performance improvement. State document size, toolchain, sample count, and whether browser drawing was included.
 - Keep dependency and runtime changes explicit. Native compatibility changes need exact version guards and real-engine regression checks.
-- Preserve upstream MIT notices and the dependency attribution listed in THIRD_PARTY_NOTICES.md.
+- Preserve upstream MIT notices and the dependency attribution listed in [THIRD_PARTY_NOTICES.md](../docs/THIRD_PARTY_NOTICES.md).
 
 The public tree contains only application source, general examples, tests, and documentation. Local projects belong in .local or an external project directory; .runtime is for generated state. Archive operations must remain non-destructive.

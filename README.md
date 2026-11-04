@@ -6,7 +6,7 @@
 
 **A local LaTeX workspace with a project home, source-linked PDF editing, and a configurable AI agent.**
 
-[简体中文](README.zh-CN.md) · [Project advantages](docs/PROJECT_ADVANTAGES.zh-CN.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
+[简体中文](README.zh-CN.md) · [Project advantages](docs/PROJECT_ADVANTAGES.zh-CN.md) · [Third-party notices](docs/THIRD_PARTY_NOTICES.md)
 
 SideX LaTeX Studio combines a focused Monaco editor, real TeX output, a terminal, and an optional agent in one browser workspace. Its local project home lets you create, import, find, rename, archive, and reopen papers without a cloud account.
 
@@ -30,7 +30,7 @@ Each project has its own file root, capability token, terminal, real-time engine
 Install **Node.js 22.11+ LTS or newer**. Install **TeX Live or MiKTeX** to compile documents. The project home can run before a TeX distribution is installed.
 
 1. Download or clone the complete repository.
-2. Double-click [Start-LaTeXStudio.cmd](Start-LaTeXStudio.cmd), or the Chinese alias [一键启动.cmd](一键启动.cmd).
+2. Double-click [Start-LaTeXStudio.cmd](scripts/launch/Start-LaTeXStudio.cmd), or the Chinese alias [一键启动.cmd](一键启动.cmd).
 3. The launcher installs locked npm dependencies on first use, builds when necessary, starts the service hidden, and opens **http://127.0.0.1:1421/home**.
 4. Create a project or import an existing local folder, then open it in the workbench.
 
@@ -120,4 +120,4 @@ The session, page-tools, and host integrations require the optional native runti
 
 ## License and origins
 
-Released under the [MIT License](LICENSE), with upstream notices preserved. Adapted realtime-tex preview and resource modules retain their Henry Yang MIT licenses in both vendor directories. Dependency licenses, including Codicons' CC BY 4.0 and PDF.js' Apache 2.0, are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Released under the [MIT License](LICENSE), with upstream notices preserved. Adapted realtime-tex preview and resource modules retain their Henry Yang MIT licenses in both vendor directories. Dependency licenses, including Codicons' CC BY 4.0 and PDF.js' Apache 2.0, are listed in [THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md).

@@ -1,6 +1,6 @@
 @echo off
 setlocal
-pushd "%~dp0" >nul 2>&1
+pushd "%~dp0..\.." >nul 2>&1
 if errorlevel 1 (
   echo Cannot open the SideX LaTeX Studio directory.
   pause
