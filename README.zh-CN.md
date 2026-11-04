@@ -1,5 +1,7 @@
 # SideX LaTeX Studio
 
+[![SideX LaTeX Studio 功能预览（界面操作动画）](docs/media/demo-preview.gif)](docs/media/demo.mp4)
+
 [观看功能演示：56 秒，无声，界面操作动画](docs/media/demo.mp4)
 
 **带项目主页、PDF 原位编辑和可配置智能体的本地 LaTeX 工作区。**

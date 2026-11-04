@@ -1,5 +1,7 @@
 # SideX LaTeX Studio
 
+[![SideX LaTeX Studio feature preview — interface animation](docs/media/demo-preview.gif)](docs/media/demo.mp4)
+
 [Watch the feature demo: 56 seconds, silent interface animation](docs/media/demo.mp4)
 
 **A local LaTeX workspace with a project home, source-linked PDF editing, and a configurable AI agent.**
