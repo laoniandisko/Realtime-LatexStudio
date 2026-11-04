@@ -32,6 +32,8 @@ Install **Node.js 22.11+ LTS or newer**. Install **TeX Live or MiKTeX** to compi
 
 The first dependency installation requires network access. The launcher does not install a large TeX distribution or modify global TeX settings. If the local service is already running, it reuses it and opens the home page.
 
+Installation and build logs stream in the launcher with elapsed time. Network retries and stage waits are bounded. If npm downloads return 502 or connection errors, check your network, proxy, or npm configuration and inspect `.runtime/npm.stdout.log` and `.runtime/npm.stderr.log`. Successful installs are reused on later starts.
+
 Manual startup:
 
 ~~~sh

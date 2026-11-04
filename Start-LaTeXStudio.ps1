@@ -12,6 +12,7 @@ $studioUrl = "http://127.0.0.1:$studioPort"
 $homeUrl = "$studioUrl/home"
 $sessionUrl = "$studioUrl/__latex/session"
 $runtimeDirectory = Join-Path $studioRoot '.runtime'
+. (Join-Path $studioRoot 'scripts/latex/startup-process.ps1')
 function Get-StudioSession {
   try {
     $session = Invoke-RestMethod -Uri $sessionUrl -TimeoutSec 2
@@ -23,10 +24,9 @@ function Invoke-StudioNpm([string[]]$NpmArguments) {
   $outFile = Join-Path $runtimeDirectory 'npm.stdout.log'
   $errFile = Join-Path $runtimeDirectory 'npm.stderr.log'
   $cliArgument = '"' + $script:npmCli + '"'
-  $process = Start-Process -FilePath $nodeExe -ArgumentList (@($cliArgument) + $NpmArguments) -WorkingDirectory $studioRoot -WindowStyle Hidden -RedirectStandardOutput $outFile -RedirectStandardError $errFile -Wait -PassThru
-  if (Test-Path -LiteralPath $outFile) { Get-Content -LiteralPath $outFile -Encoding UTF8 | Write-Host }
-  if (Test-Path -LiteralPath $errFile) { Get-Content -LiteralPath $errFile -Encoding UTF8 | Write-Host }
-  if ($process.ExitCode -ne 0) { throw "npm $($NpmArguments -join ' ') failed (exit $($process.ExitCode)). See .runtime/npm.stderr.log." }
+  $stage = if ($NpmArguments[0] -eq 'ci') { 'Installing dependencies' } else { 'Building application' }
+  $limit = if ($NpmArguments[0] -eq 'ci') { 600 } else { 180 }
+  Invoke-StudioProcess -Executable $nodeExe -Arguments (@($cliArgument) + $NpmArguments) -WorkingDirectory $studioRoot -OutputFile $outFile -ErrorFile $errFile -Stage $stage -TimeoutSeconds $limit
 }
 function Test-BuildRequired {
   $entry = Join-Path $studioRoot 'dist-latex/home.html'
@@ -37,7 +37,7 @@ function Test-BuildRequired {
     $inputPath = Join-Path $studioRoot $relative
     if ((Test-Path -LiteralPath $inputPath) -and (Get-Item -LiteralPath $inputPath).LastWriteTimeUtc -gt $builtAt) { return $true }
   }
-  foreach ($relative in @('src/latex', 'scripts/latex', 'public')) {
+  foreach ($relative in @('src/latex', 'public')) {
     $inputPath = Join-Path $studioRoot $relative
     if (Test-Path -LiteralPath $inputPath) {
       foreach ($item in Get-ChildItem -LiteralPath $inputPath -Recurse -File) {
@@ -47,9 +47,17 @@ function Test-BuildRequired {
   }
   return $false
 }
+$startupMutex = $null
+$hasStartupMutex = $false
 try {
   $running = Get-StudioSession
   if (-not $running) {
+    # Serialize installation in this checkout without changing other projects.
+    $hasher = [System.Security.Cryptography.SHA256]::Create()
+    try { $checkoutHash = [BitConverter]::ToString($hasher.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($studioRoot.ToLowerInvariant()))).Replace('-', '') } finally { $hasher.Dispose() }
+    $startupMutex = [System.Threading.Mutex]::new($false, ('Local\SideXLaTeXStudio-' + $checkoutHash))
+    try { $hasStartupMutex = $startupMutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $hasStartupMutex = $true }
+    if (-not $hasStartupMutex) { throw 'Another launcher is already installing or starting this checkout. Keep its window open and wait for it to finish. Progress is in .runtime/npm.stdout.log and .runtime/npm.stderr.log.' }
     $nodeCommand = Get-Command node.exe -ErrorAction SilentlyContinue
     if (-not $nodeCommand) { throw 'Node.js 22.11 or newer is required. Install the current LTS from https://nodejs.org/ and run this file again.' }
     $nodeExe = $nodeCommand.Source
@@ -74,7 +82,8 @@ try {
     try {
       if (-not (Test-Path -LiteralPath (Join-Path $studioRoot 'node_modules')) -or $installedHash -ne $lockHash) {
         Write-Host 'Installing locked dependencies (first run or lockfile changed)...'
-        Invoke-StudioNpm -NpmArguments @('ci', '--no-audit', '--no-fund')
+        Write-Host 'Cached packages are preferred; network requests time out after 20s with one retry. Installation progress follows below.'
+        Invoke-StudioNpm -NpmArguments @('ci', '--no-audit', '--no-fund', '--prefer-offline', '--loglevel=info', '--foreground-scripts', '--fetch-timeout=20000', '--fetch-retries=1', '--fetch-retry-mintimeout=2000', '--fetch-retry-maxtimeout=5000')
         Set-Content -LiteralPath $stamp -Value $lockHash -Encoding ascii
       }
       if (Test-BuildRequired) {
@@ -105,4 +114,7 @@ try {
   Write-Host ''
   Write-Host $_.Exception.Message -ForegroundColor Red
   exit 1
+} finally {
+  if ($hasStartupMutex) { $startupMutex.ReleaseMutex() }
+  if ($startupMutex) { $startupMutex.Dispose() }
 }
