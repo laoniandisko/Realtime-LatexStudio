@@ -1,0 +1,37 @@
+name: Cross-platform launchers
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:launcher
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Start the actual application on POSIX
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          SIDEX_PORT: '1422'
+        run: |
+          ./Start-LaTeXStudio.sh --no-browser
+          ./Start-LaTeXStudio.sh --no-browser
+          curl --fail http://127.0.0.1:1422/home
+          kill "$(cat latex-service.pid)"

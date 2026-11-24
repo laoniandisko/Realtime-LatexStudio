@@ -52,6 +52,34 @@ npm start
 npm run dev
 ~~~
 
+## Linux / macOS 一键启动
+
+先安装 **Node.js 22.11+（含 npm）**。编译文档需要 Linux 上的 **TeX Live** 或 macOS 上的 **MacTeX / BasicTeX**；尚未安装 TeX 时也能进入项目主页。
+
+- **macOS：**在 Finder 中双击 [Start-LaTeXStudio.command](Start-LaTeXStudio.command)。
+- **Linux：**运行 [Start-LaTeXStudio.sh](Start-LaTeXStudio.sh)；文件管理器支持时也可选择“作为程序运行”。
+
+~~~sh
+./Start-LaTeXStudio.sh
+~~~
+
+两个入口都支持带空格的项目路径，也可从其他工作目录调用。首次启动自动安装锁定依赖、按需构建、在后台启动服务并打开 **http://127.0.0.1:1421/home**。后续启动会复用已有服务。系统、CPU 架构、Node ABI 或锁文件变化时会重新安装原生依赖。脚本不会自动安装 TeX 或可选的 realtime-tex 二进制。
+
+如果 ZIP 解压后缺少执行权限，运行 `chmod +x Start-LaTeXStudio.sh Start-LaTeXStudio.command`，或使用 `sh Start-LaTeXStudio.sh`。macOS 对下载脚本提示确认时，可使用 Finder 正常的“打开”操作。
+
+无图形桌面的服务器或需要更换端口时：
+
+~~~sh
+./Start-LaTeXStudio.sh --no-browser
+SIDEX_PORT=1422 ./Start-LaTeXStudio.sh --no-browser
+~~~
+
+服务仅监听 `127.0.0.1`；远程服务器可通过 SSH 转发端口后访问。关闭启动终端不会停止服务。在项目目录中执行 `kill "$(cat latex-service.pid)"` 可停止服务。安装/构建日志位于 `.runtime/npm.stdout.log` 和 `.runtime/npm.stderr.log`，服务日志位于 `latex-service.stdout.log` 和 `latex-service.stderr.log`。
+
+普通编译使用已安装的 TeX 引擎。目前 `npm run setup:rtex` 自动安装器与嵌入式实时宿主仍面向 Windows x64；Linux/macOS 如需可选实时引擎，请另行安装对应平台的上游 [realtime-tex CLI](https://github.com/HenryXiaoYang/realtime-tex/releases)，并通过 `SIDEX_RTEX_PATH` 指定可执行文件。一键启动支持不代表所有原生实时编辑功能都已在每个平台验证。
+
+运行 `npm run test:launcher` 可执行独立启动集成测试；CI 覆盖 Windows、Linux 和 macOS，并在 POSIX 平台启动实际应用进行检查。
+
 ## 可选实时排版
 
 普通编译使用本机可用的 pdfLaTeX、XeLaTeX 或 LuaLaTeX。实时段落排版使用 LuaLaTeX 和固定的 realtime-tex 0.0.6。

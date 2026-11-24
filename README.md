@@ -52,6 +52,34 @@ For development:
 npm run dev
 ~~~
 
+## Start on Linux or macOS
+
+Install **Node.js 22.11+ with npm**. To compile documents, install **TeX Live** on Linux or **MacTeX / BasicTeX** on macOS. The project home works before TeX is installed.
+
+- **macOS:** double-click [Start-LaTeXStudio.command](Start-LaTeXStudio.command) in Finder.
+- **Linux:** run [Start-LaTeXStudio.sh](Start-LaTeXStudio.sh), or choose “Run as a program” if your file manager supports it.
+
+~~~sh
+./Start-LaTeXStudio.sh
+~~~
+
+The launcher supports paths containing spaces and invocation from any directory. It installs locked dependencies on first use, builds when needed, starts a detached local service, and opens **http://127.0.0.1:1421/home**. Subsequent launches reuse the service. Native dependencies are reinstalled when the OS, CPU architecture, Node ABI, or lockfile changes. TeX and optional realtime-tex binaries are not installed automatically.
+
+If an extracted ZIP loses executable permissions, run `chmod +x Start-LaTeXStudio.sh Start-LaTeXStudio.command`, or use `sh Start-LaTeXStudio.sh`. For downloaded scripts, use Finder's normal Open action if macOS prompts you.
+
+For a server without a graphical desktop, or to choose another port:
+
+~~~sh
+./Start-LaTeXStudio.sh --no-browser
+SIDEX_PORT=1422 ./Start-LaTeXStudio.sh --no-browser
+~~~
+
+The service listens only on `127.0.0.1`. For remote access, forward the port over SSH and open the local forwarded URL. Closing the launcher terminal leaves the service running. To stop it, run `kill "$(cat latex-service.pid)"` from this checkout. Installation/build logs are in `.runtime/npm.stdout.log` and `.runtime/npm.stderr.log`; service logs are `latex-service.stdout.log` and `latex-service.stderr.log`.
+
+Normal compilation uses your installed TeX engines. The automated `npm run setup:rtex` helper and embedded real-time host currently target Windows x64. On Linux/macOS, install a matching upstream [realtime-tex CLI](https://github.com/HenryXiaoYang/realtime-tex/releases) separately and set `SIDEX_RTEX_PATH` to its executable for the optional live engine. Cross-platform startup does not mean every native live-editing feature has been validated on each OS.
+
+Run `npm run test:launcher` for isolated launcher integration tests. CI checks Windows, Linux, and macOS and starts the actual application on POSIX runners.
+
 ## Enable live paragraph typesetting
 
 Normal compilation supports the available pdfLaTeX, XeLaTeX, and LuaLaTeX engines. The optional real-time integration uses LuaLaTeX and a pinned realtime-tex 0.0.6 runtime.
